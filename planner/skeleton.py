@@ -171,6 +171,36 @@ def _gemini_cli_generate_simple(prompt: str, model_id: str, *, timeout_s: Option
     return proc.stdout.strip()
 
 def _gemini_rest_generate_simple(prompt: str, model_id: str, *, timeout_s: Optional[int] = None) -> str:
+    # Try OpenRouter first if key is available
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if openrouter_key:
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {openrouter_key}", "Content-Type": "application/json"}
+        body = {"model": "deepseek/deepseek-v4-flash:free", "messages": [{"role": "user", "content": prompt}], "max_tokens": OLLAMA_NUM_PREDICT}
+        try:
+            resp = _SESSION.post(url, json=body, headers=headers, timeout=timeout_s or OLLAMA_TIMEOUT_S)
+            resp.raise_for_status()
+            data = resp.json()
+            choices = data.get("choices") or []
+            if choices:
+                return (choices[0].get("message", {}).get("content") or "").strip()
+        except Exception:
+            pass
+    # Try Groq if available
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        try:
+            url2 = "https://api.groq.com/openai/v1/chat/completions"
+            headers2 = {"Authorization": f"Bearer {groq_key}"}
+            body2 = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "max_tokens": OLLAMA_NUM_PREDICT}
+            resp2 = _SESSION.post(url2, json=body2, headers=headers2, timeout=timeout_s or OLLAMA_TIMEOUT_S)
+            resp2.raise_for_status()
+            data2 = resp2.json()
+            choices2 = data2.get("choices") or []
+            if choices2:
+                return (choices2[0].get("message", {}).get("content") or "").strip()
+        except Exception:
+            pass
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set (needed for Gemini REST)")
