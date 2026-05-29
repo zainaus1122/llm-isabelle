@@ -1,3 +1,13 @@
+## Fork by Zain ul Abdeen (S5309493)
+### Changes Made:
+- Fixed Windows/Cygwin path conversion bug in isabelle_api.py
+- Fixed session_id extraction in cli.py  
+- Fixed finished_ok result verification in isabelle_api.py
+- Added Groq API support in planner/skeleton.py
+- Added ML Reranker training data
+
+- ---------------------------------------------------------------------------------
+
 The following are simple suits for testing functionalities only:
 
 - logic.txt
