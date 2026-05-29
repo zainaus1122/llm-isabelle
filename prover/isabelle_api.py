@@ -95,7 +95,10 @@ def _write_tmp_theory(theory_text: str) -> Tuple[str, str]:
     Legacy helper (not used by this module). Creates a temp dir and writes Scratch.thy.
     Returns (tmpdir_path, file_path). Note: the temp directory lifetime is not managed here.
     """
-    tmpdir = tempfile.TemporaryDirectory()
+    _tmp_base = os.path.join(os.environ.get("TEMP", "C:\\Temp"), "isatmp")
+    os.makedirs(_tmp_base, exist_ok=True)
+    _cygwin_tmp = "/cygdrive/c/Users/zain ul abdeen/AppData/Local/Temp/isatmp"
+    tmpdir = tempfile.TemporaryDirectory(dir=_tmp_base)
     p = os.path.join(tmpdir.name, "Scratch.thy")
     with open(p, "w", encoding="utf-8") as f:
         f.write(theory_text)
@@ -163,7 +166,7 @@ def run_theory(
     _use_calls += 1
     _last_call_timed_out = False
 
-    tmpdir = tempfile.TemporaryDirectory()
+    tmpdir = tempfile.TemporaryDirectory(dir="C:\\Users\\zain ul abdeen\\AppData\\Local\\Temp\\cygwin_tmp")
     try:
         p = os.path.join(tmpdir.name, "Scratch.thy")
         with open(p, "w", encoding="utf-8") as f:
@@ -180,7 +183,7 @@ def run_theory(
         if timeout_s > 0:
             # Always enforce a wall-clock timeout (even if native timeouts exist but are ignored).
             with ThreadPoolExecutor(max_workers=1) as ex:
-                fut = ex.submit(_use_theories_call, isabelle, session_id=session_id, master_dir=tmpdir.name, timeout_s=timeout_s)
+                fut = ex.submit(_use_theories_call, isabelle, session_id=session_id, master_dir=tmpdir.name.replace("C:\\", "/cygdrive/c/").replace("\\", "/"), timeout_s=timeout_s)
                 try:
                     return fut.result(timeout=timeout_s)
                 except FuturesTimeout:
@@ -190,7 +193,7 @@ def run_theory(
                     return []
 
         # No timeout requested → direct call
-        return list(isabelle.use_theories(theories=["Scratch"], session_id=session_id, master_dir=tmpdir.name))
+        return list(isabelle.use_theories(theories=["Scratch"], session_id=session_id, master_dir=tmpdir.name.replace("C:\\", "/cygdrive/c/").replace("\\", "/")))
     finally:
         tmpdir.cleanup()
 
@@ -218,13 +221,17 @@ def finished_ok(resps: List[IsabelleResponse]) -> Tuple[bool, Dict[str, Any]]:
     for r in (resps or []):
         if _normalize_type(_get_field(r, ("response_type", "type", "kind", "tag", "name"))) != "FINISHED":
             continue
-        obj = _decode_body_to_dict(_get_field(r, ("response_body", "body", "message", "payload")))
+        body = _get_field(r, ("response_body", "body", "message", "payload"))
+        # Direct attribute check (new isabelle_client returns objects not dicts)
+        if hasattr(body, 'ok'):
+            if bool(body.ok):
+                any_ok = True
+            continue
+        obj = _decode_body_to_dict(body)
         if not isinstance(obj, dict):
             continue
-        last_obj = obj  # track last FINISHED
-        # Some client variants can produce partial/unfinished results; keep the check strict.
+        last_obj = obj
         if bool(obj.get("ok", False)) or str(obj.get("result", "")).lower() == "ok":
-            # If the FINISHED payload itself indicates a timeout, do not accept.
             if str(obj.get("timeout", "")).lower() in ("1", "true", "yes"):
                 continue
             any_ok = True
