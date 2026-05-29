@@ -235,7 +235,8 @@ def main():
         server_info, proc = start_isabelle_server(name="isabelle", log_file="server.log")
         print(server_info.strip())
         isabelle = get_isabelle_client(server_info)
-        session_id = isabelle.session_start(session="HOL")
+        session_raw = isabelle.session_start(session="HOL")
+        session_id = next(r.response_body.session_id for r in session_raw if hasattr(r, 'response_body') and hasattr(r.response_body, 'session_id'))
         print("session_id:", session_id)
 
         # Mine macros from existing logs (fast; skips if file missing)
